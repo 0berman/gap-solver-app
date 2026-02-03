@@ -1,2 +1,7 @@
 # Ignore the archive folder
 xx) archive/
+
+# Standard Python ignores
+__pycache__/
+*.pyc
+.streamlit/
