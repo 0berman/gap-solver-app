@@ -28,9 +28,21 @@ def clear_grid_state():
 # ==========================================
 @st.cache_resource
 def load_model():
-    if os.path.exists("model.pkl"):
-        return joblib.load("model.pkl")
-    return None
+    # 1. Get the folder where THIS script (app.py) is located
+    #    This works no matter where the file is (cloud or local)
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    
+    # 2. Join it with the model filename
+    #    This creates "C:\...\phase3-SVM\model.pkl" on Windows
+    #    and "/app/.../phase3-SVM/model.pkl" on Cloud automatically.
+    model_path = os.path.join(current_dir, "model.pkl")
+    
+    # 3. Load it
+    if os.path.exists(model_path):
+        return joblib.load(model_path)
+    else:
+        st.error(f"Model not found at: {model_path}")
+        return None
 
 def smart_crop_board(image, grid_n):
     img = image.copy()
@@ -229,9 +241,9 @@ with col1:
         # Display the RGB view
         if 'cropped_view' in st.session_state:
             # Use 'use_container_width' to fix deprecation warning
-            st.image(st.session_state.cropped_view, caption="Detected Board", use_container_width=True)
+            st.image(st.session_state.cropped_view, caption="Detected Board", width="stretch")
         else:
-            st.image(paste_result.image_data, caption="Raw Paste", use_container_width=True)
+            st.image(paste_result.image_data, caption="Raw Paste", width="stretch")
             
     else:
         st.info(f"Paste a {grid_size}x{grid_size} screenshot to begin.")
@@ -255,13 +267,17 @@ with col2:
             row_data = []
             for c in range(grid_size):
                 val = st.session_state.grid_data[r][c]
-                # Include paste ID in key to force reset on new image
+
+                # --- UI IMPROVEMENT: CLEANER DROPDOWNS ---
+                # We use format_func to hide 'blank' text, making it look empty
                 new_val = cols[c].selectbox(
                     label=f"({r},{c})",
                     options=shape_options,
                     index=shape_options.index(val) if val in shape_options else 0,
                     key=f"c_{r}_{c}_{st.session_state.last_paste_id}",
-                    label_visibility="collapsed"
+                    label_visibility="collapsed",
+                    # This line replaces 'blank' with '' in the UI, keeping the data as 'blank'
+                    format_func=lambda x: "" if x == "blank" else x
                 )
                 row_data.append(new_val)
             updated_grid.append(row_data)

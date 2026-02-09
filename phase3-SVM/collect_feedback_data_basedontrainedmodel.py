@@ -9,7 +9,7 @@ import time
 # CONFIGURATION
 # ==========================================
 # Folder containing your raw screenshots (e.g. "raw_screenshots")
-INPUT_FOLDER = r"C:\Github Code\gap-solver-app\examples\5" 
+INPUT_FOLDER = r"C:\Github Code\gap-solver-app\examples\new_5"
 
 # Where to save the sorted crops
 OUTPUT_BASE = r"C:\Github Code\gap-solver-app\new_datasets"

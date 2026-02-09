@@ -7,7 +7,7 @@ from sklearn.model_selection import GridSearchCV, train_test_split
 from sklearn.metrics import classification_report
 from preprocess import standardize_cell 
 
-DATA_DIR = "dataset"
+DATA_DIR = r"C:\Github Code\gap-solver-app\dataset"
 MODEL_FILE = "model.pkl"
 
 def load_data():
