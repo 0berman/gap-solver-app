@@ -12,17 +12,17 @@ import time
 INPUT_FOLDER = r"C:\Github Code\gap-solver-app\examples\5" 
 
 # Where to save the sorted crops
-OUTPUT_BASE = r"C:\Github Code\gap-solver-app\new_dataset"
+OUTPUT_BASE = r"C:\Github Code\gap-solver-app\new_datasets"
 
 # Grid size to assume (usually 5 for the hard levels)
 GRID_SIZE = 5
 
 # Load your current brain
-if not os.path.exists("C:\Github Code\gap-solver-app\model.pkl"):
+if not os.path.exists("C:\Github Code\gap-solver-app\phase3-SVM\model.pkl"):
     print("❌ Error: model.pkl not found!")
     exit()
 
-model_data = joblib.load("C:\Github Code\gap-solver-app\model.pkl")
+model_data = joblib.load("C:\Github Code\gap-solver-app\phase3-SVM\model.pkl")
 clf = model_data['model']
 classes = model_data['classes']
 

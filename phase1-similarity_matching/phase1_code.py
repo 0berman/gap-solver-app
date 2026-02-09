@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 import os
 
-def debug_ultimate_solver(screenshot_path, template_folder, grid_size=4):
+def debug_ultimate_solver(screenshot_path, template_folder, grid_size=5):
     # --- 1. SETUP ---
     img_rgb = cv2.imread(screenshot_path)
     if img_rgb is None:
@@ -123,7 +123,7 @@ def debug_ultimate_solver(screenshot_path, template_folder, grid_size=4):
 
 
 
-shapes_template_location = '/Users/jordanchong/Desktop/github code/gap-solver-app/phase 1 image matching/assets/templates/'
-screenshot_filelocation = '/Users/jordanchong/Desktop/github code/gap-solver-app/phase 1 image matching/assets/Example1.png'
-debug_ultimate_solver(screenshot_filelocation, shapes_template_location)
+shapes_template_location = r"C:\Github Code\gap-solver-app\phase1-similarity_matching\assets\templates"
+screenshot_filelocation = r"C:\Github Code\gap-solver-app\examples\5\Screenshot 2026-02-04 142421.png"             
+debug_ultimate_solver(screenshot_filelocation, shapes_template_location)             
 #cv2.imwrite("/Users/jordanchong/Desktop/github code/gap-solver-app/phase 1 image matching/assets/act1_failure.png", result)

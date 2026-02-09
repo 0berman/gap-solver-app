@@ -7,23 +7,23 @@ import os
 # CONFIGURATION
 # ==========================================
 # CHANGE THIS TO YOUR SCREENSHOT PATH
-IMAGE_PATH = r"C:\Github Code\gap-solver-app\examples\Screenshot 2026-02-04 115039.png"
-GRID_SIZE = 4
-
-# Load the trained model
-if not os.path.exists("C:\Github Code\gap-solver-app\model.pkl"):
-    print("❌ Error: model.pkl not found. Train your model first!")
+IMAGE_PATH = r"C:\Github Code\gap-solver-app\examples\xx) done\5\Screenshot 2026-02-04 101304.png"
+GRID_SIZE = 5        
+# Load Model
+MODEL_PATH = r"C:\Github Code\gap-solver-app\phase3-SVM\model.pkl"
+if not os.path.exists(MODEL_PATH):
+    print("❌ Error: model.pkl not found.")
     exit()
 
-model_data = joblib.load("C:\Github Code\gap-solver-app\model.pkl")
+model_data = joblib.load(MODEL_PATH)
 clf = model_data['model']
 classes = model_data['classes']
 
 # ==========================================
-# 1. THE EXACT PRE-PROCESSOR (Must match app.py)
+# 1. PREPROCESSING (The "Universal Translator")
 # ==========================================
 def standardize_cell(img):
-    # Resize to 64x64 (Matches your latest training)
+    # Resize to 64x64
     img = cv2.resize(img, (64, 64))
     
     # Blur
@@ -52,7 +52,7 @@ def standardize_cell(img):
     h, w = mask.shape
     cv2.rectangle(mask, (0,0), (w, h), 0, 2)
     
-    # Final Re-Centering (The Seeker)
+    # Re-Center
     coords = cv2.findNonZero(mask)
     final_img = np.zeros((64, 64), dtype=np.uint8)
     
@@ -65,9 +65,14 @@ def standardize_cell(img):
         
     return final_img
 
+# ==========================================
+# 2. YOUR ORIGINAL SMART CROPPER
+# ==========================================
 def smart_crop_board(image, grid_n):
     img = image.copy()
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    
+    # Adaptive Thresholding (Your preferred logic)
     thresh = cv2.adaptiveThreshold(
         gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
         cv2.THRESH_BINARY_INV, 11, 2
@@ -76,8 +81,10 @@ def smart_crop_board(image, grid_n):
     
     expected_w = img.shape[1] // grid_n
     valid_boxes = []
+    
     for c in contours:
         x, y, w, h = cv2.boundingRect(c)
+        # Your specific aspect ratio and width filters
         if 0.7 < w/h < 1.3 and expected_w*0.2 < w < expected_w*1.5:
             valid_boxes.append((x,y,w,h))
             
@@ -89,10 +96,11 @@ def smart_crop_board(image, grid_n):
     max_y = max([b[1]+b[3] for b in valid_boxes])
     
     if (max_x - min_x) < img.shape[1] * 0.2: return img
+    
     return img[min_y:max_y, min_x:max_x]
 
 # ==========================================
-# 2. DEBUGGER LOOP
+# 3. DIAGNOSTIC DASHBOARD
 # ==========================================
 def main():
     if not os.path.exists(IMAGE_PATH):
@@ -101,64 +109,86 @@ def main():
 
     original_img = cv2.imread(IMAGE_PATH)
     
-    # 1. Find Board
+    # 1. Find Board using YOUR logic
     board = smart_crop_board(original_img, GRID_SIZE)
     h, w = board.shape[:2]
     cell_h, cell_w = h // GRID_SIZE, w // GRID_SIZE
     
-    print(f"Board Found. Press SPACE to step through cells. ESC to quit.")
+    print(f"Board Found: {w}x{h}. Press SPACE for next cell.")
+
+    # Create Dashboard Canvas
+    dash_h, dash_w = 700, 1200
+    dashboard = np.zeros((dash_h, dash_w, 3), dtype=np.uint8)
 
     for r in range(GRID_SIZE):
         for c in range(GRID_SIZE):
             y1, x1 = r*cell_h, c*cell_w
+            y2, x2 = y1+cell_h, x1+cell_w
             
-            # Slice with margin (Same as App)
+            # Boundary Check
+            if y2 > h or x2 > w: continue
+
+            # Extract (with your 5% margin logic)
             m_h = int(cell_h * 0.05)
             m_w = int(cell_w * 0.05)
             raw_cell = board[y1:y1+cell_h, x1:x1+cell_w]
             safe_cell = raw_cell[m_h:cell_h-m_h, m_w:cell_w-m_w]
             
-            # 2. PROCESS (See what the SVM sees)
+            # Process & Predict
             svm_input = standardize_cell(safe_cell)
-            
-            # 3. PREDICT
             feat = svm_input.flatten() / 255.0
             pred_idx = clf.predict([feat])[0]
-            # If your model stores string labels directly, pred_idx is the label
-            label = str(pred_idx) 
+            label = str(pred_idx)
             
-            # ==================================
-            # VISUALIZATION
-            # ==================================
-            # Make side-by-side comparison
-            # Resize raw cell to 300x300 for easy viewing
-            view_raw = cv2.resize(safe_cell, (300, 300))
+            # --- BUILD VISUALIZATION ---
+            dashboard[:] = (30, 30, 30) # Dark Gray Background
             
-            # Resize SVM input (64x64) up to 300x300 so we can see pixels
-            view_svm = cv2.resize(svm_input, (300, 300), interpolation=cv2.INTER_NEAREST)
-            view_svm_color = cv2.cvtColor(view_svm, cv2.COLOR_GRAY2BGR)
+            # 1. LEFT PANEL: Full Board Context
+            scale = 600 / h
+            disp_w = int(w * scale)
+            board_disp = cv2.resize(board, (disp_w, 600))
             
-            # Stack them
-            combined = np.hstack((view_raw, view_svm_color))
+            # Draw Green Box around current cell
+            bx1 = int(x1 * scale)
+            by1 = int(y1 * scale)
+            bx2 = int(x2 * scale)
+            by2 = int(y2 * scale)
+            cv2.rectangle(board_disp, (bx1, by1), (bx2, by2), (0, 255, 0), 4)
             
-            # Draw Info
-            # Green text if it detected something, Red if blank
-            color = (0, 255, 0) if cv2.countNonZero(svm_input) > 0 else (0, 0, 255)
+            # Paste Board into Dashboard
+            dashboard[50:650, 50:50+disp_w] = board_disp
+            cv2.putText(dashboard, "1. GLOBAL CONTEXT", (50, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (200, 200, 200), 2)
+
+            # 2. TOP RIGHT: Raw Cell Zoom
+            zoom_size = 280
+            raw_zoom = cv2.resize(safe_cell, (zoom_size, zoom_size))
+            x_right = 50 + disp_w + 50
+            dashboard[50:50+zoom_size, x_right:x_right+zoom_size] = raw_zoom
+            cv2.rectangle(dashboard, (x_right, 50), (x_right+zoom_size, 50+zoom_size), (255, 255, 255), 2)
+            cv2.putText(dashboard, "2. HUMAN VIEW (Raw)", (x_right, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 1)
+
+            # 3. BOTTOM RIGHT: SVM Input (The "Brain")
+            svm_zoom = cv2.resize(svm_input, (zoom_size, zoom_size), interpolation=cv2.INTER_NEAREST)
+            svm_zoom_color = cv2.cvtColor(svm_zoom, cv2.COLOR_GRAY2BGR)
             
-            cv2.rectangle(combined, (0,0), (600, 40), (0,0,0), -1)
-            cv2.putText(combined, f"Cell ({r},{c}) -> Prediction: {label}", (10, 30), 
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
+            y_svm = 50 + zoom_size + 40
+            dashboard[y_svm:y_svm+zoom_size, x_right:x_right+zoom_size] = svm_zoom_color
+            cv2.rectangle(dashboard, (x_right, y_svm), (x_right+zoom_size, y_svm+zoom_size), (0, 255, 255), 2)
+            cv2.putText(dashboard, "3. MACHINE VIEW (Preprocessed)", (x_right, y_svm-10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 1)
+
+            # 4. PREDICTION LABEL
+            cv2.putText(dashboard, f"PREDICTION: {label}", (x_right, y_svm + zoom_size + 40), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
+
+            cv2.imshow("Act 3: SVM Diagnostic Center", dashboard)
             
-            cv2.imshow("Debugger: Left=Reality, Right=SVM Brain", combined)
-            
-            # Wait for key
             key = cv2.waitKey(0)
             if key == 27: # ESC
                 cv2.destroyAllWindows()
                 return
 
     cv2.destroyAllWindows()
-    print("Done.")
+    print("Debugging Complete.")
 
 if __name__ == "__main__":
     main()

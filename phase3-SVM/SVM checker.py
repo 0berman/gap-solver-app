@@ -6,7 +6,7 @@ import numpy as np
 FOLDER = r"C:\Github Code\gap-solver-app\dataset\5star"
 files = os.listdir(FOLDER)[:] # Just check 5 images
 
-# preprocess.py
+# preprocess.py             
 import cv2
 import numpy as np
 
