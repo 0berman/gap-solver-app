@@ -15,13 +15,24 @@ from preprocess import standardize_cell
 # ==========================================
 st.set_page_config(page_title="Gap Solver AI", layout="wide", page_icon="🧩")
 
+# Initialize Session State Variables
 if 'grid_data' not in st.session_state: st.session_state.grid_data = None
 if 'last_paste_id' not in st.session_state: st.session_state.last_paste_id = 0
+
+# --- FIX START: Initialize Grid Size State ---
+if 'current_grid_n' not in st.session_state: st.session_state.current_grid_n = 4
+# --- FIX END ---
 
 # Callback to clear state explicitly (extra safety)
 def clear_grid_state():
     st.session_state.grid_data = None
     st.session_state.last_paste_id = 0
+
+# Callback for Radio Button Change
+def update_grid_n():
+    # Update the persistent variable based on widget choice
+    st.session_state.current_grid_n = st.session_state.grid_radio_widget
+    clear_grid_state()
 
 # ==========================================
 # 2. HELPER FUNCTIONS
@@ -186,12 +197,15 @@ with st.sidebar:
 
     st.markdown("---")
     
-    # 2. GRID SIZE (With Callback)
+    # 2. GRID SIZE (FIXED STATE)
+    # This uses a persistent key "grid_radio_widget"
+    # and sets the index based on the saved session state variable.
     grid_size = st.radio(
         "Grid Size", 
         (4, 5), 
-        index=0, 
-        on_change=clear_grid_state
+        index=0 if st.session_state.current_grid_n == 4 else 1,
+        key="grid_radio_widget",
+        on_change=update_grid_n
     )
     
     st.markdown("---")
@@ -212,20 +226,16 @@ col1, col2 = st.columns([1, 1.2])
 with col1:
     st.subheader("1. Input")
     
-    # KEY TRICK: We attach grid_size to the key.
-    # When grid_size changes, this becomes a "new" button, resetting the paste state entirely.
+    # We use grid_size (which comes from the stable widget) for the key
     paste_result = pbutton("📋 Paste Image", key=f"paste_btn_{grid_size}")
     
     if paste_result.image_data is not None:
-        # Generate unique ID for this paste
         current_paste_id = hash(paste_result.image_data.tobytes())
         
-        # New Paste Logic
         if current_paste_id != st.session_state.last_paste_id or st.session_state.grid_data is None:
             st.session_state.last_paste_id = current_paste_id
             
             with st.spinner(f"Solving {grid_size}x{grid_size}..."):
-                # Convert to BGR for OpenCV
                 img_array = np.array(paste_result.image_data.convert('RGB'))[:, :, ::-1]
                 
                 if model_data:
@@ -233,26 +243,23 @@ with col1:
                     preds, cropped_bgr = predict_grid_labels(img_array, grid_size, clf)
                     
                     st.session_state.grid_data = preds
-                    # Save RGB version for display (Fixes Color Shift)
                     st.session_state.cropped_view = cv2.cvtColor(cropped_bgr, cv2.COLOR_BGR2RGB)
                 else:
                     st.warning("Train model first.")
                     
-        # Display the RGB view
         if 'cropped_view' in st.session_state:
-            # Use 'use_container_width' to fix deprecation warning
             st.image(st.session_state.cropped_view, caption="Detected Board", width="stretch")
         else:
             st.image(paste_result.image_data, caption="Raw Paste", width="stretch")
             
     else:
+        # This will now correctly use the persistent grid_size (4 or 5)
         st.info(f"Paste a {grid_size}x{grid_size} screenshot to begin.")
 
 # --- RIGHT COLUMN: EDITOR & SOLUTION ---
 with col2:
     st.subheader("2. Verify & Solve")
     
-    # Render only if valid data exists
     if st.session_state.grid_data and len(st.session_state.grid_data) == grid_size:
         
         shape_options = sorted(model_data['classes']) if model_data else ['1circle', '2triangle', '3square', '4cross', '5star']
@@ -261,22 +268,18 @@ with col2:
 
         updated_grid = []
         
-        # Grid Editor
         for r in range(grid_size):
             cols = st.columns(grid_size)
             row_data = []
             for c in range(grid_size):
                 val = st.session_state.grid_data[r][c]
-
-                # --- UI IMPROVEMENT: CLEANER DROPDOWNS ---
-                # We use format_func to hide 'blank' text, making it look empty
+                
                 new_val = cols[c].selectbox(
                     label=f"({r},{c})",
                     options=shape_options,
                     index=shape_options.index(val) if val in shape_options else 0,
                     key=f"c_{r}_{c}_{st.session_state.last_paste_id}",
                     label_visibility="collapsed",
-                    # This line replaces 'blank' with '' in the UI, keeping the data as 'blank'
                     format_func=lambda x: "" if x == "blank" else x
                 )
                 row_data.append(new_val)
@@ -284,7 +287,6 @@ with col2:
         
         st.session_state.grid_data = updated_grid
         
-        # Auto-Solve
         st.markdown("---")
         result, final_board = run_solver_logic(updated_grid)
         
@@ -298,7 +300,6 @@ with col2:
             st.warning("Check grid for errors.")
             
     elif st.session_state.grid_data:
-        # Fallback if state gets messy
         st.warning("State mismatch. Click Reset.")
 
 # ==========================================
